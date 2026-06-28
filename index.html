@@ -240,6 +240,76 @@
 
   :focus-visible{outline:2px solid var(--b);outline-offset:2px;border-radius:8px}
 
+  /* ---------- composer (type anywhere) ---------- */
+  .composer{display:flex;align-items:center;gap:8px}
+  .composer__lang{
+    flex:none;min-width:46px;height:44px;border-radius:12px;padding:0 8px;
+    font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:14px;letter-spacing:.03em;
+    background:var(--surface);border:1px solid var(--line);
+    transition:color .15s,border-color .15s;
+  }
+  .composer__lang--a{color:var(--a);border-color:color-mix(in srgb,var(--a) 42%,var(--line))}
+  .composer__lang--b{color:var(--b);border-color:color-mix(in srgb,var(--b) 42%,var(--line))}
+  .composer__input{
+    flex:1;min-width:0;height:44px;border-radius:12px;padding:0 14px;
+    background:var(--surface);border:1px solid var(--line);color:var(--text);
+    font-family:inherit;font-size:15px;outline:none;transition:border-color .15s;
+  }
+  .composer__input:focus{border-color:var(--line-2)}
+  .composer__input::placeholder{color:var(--faint)}
+  .composer__send{
+    flex:none;width:44px;height:44px;border-radius:12px;
+    background:var(--surface-2);border:1px solid var(--line);color:var(--muted);
+    display:grid;place-items:center;transition:color .15s,background .15s;
+  }
+  .composer__send:hover{color:var(--text);background:var(--surface-3)}
+  .app.cam-on .composer__lang,
+  .app.cam-on .composer__input,
+  .app.cam-on .composer__send{background:rgba(20,22,27,.6);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+
+  /* ---------- camera mode ---------- */
+  .cam{
+    position:absolute;inset:0;width:100%;height:100%;
+    object-fit:cover;background:#0b0c0f;z-index:0;display:none;
+  }
+  .cam.mirror{transform:scaleX(-1)}
+  .topbar,.langbar,.banner,.stream,.dock{position:relative;z-index:1}
+  .iconbtn{
+    width:40px;height:40px;border-radius:11px;flex:none;
+    background:var(--surface);border:1px solid var(--line);
+    display:grid;place-items:center;color:var(--muted);
+    transition:color .18s,background .18s,border-color .18s;
+  }
+  .iconbtn:hover{color:var(--text);background:var(--surface-3)}
+  .iconbtn.active{
+    color:var(--b);border-color:var(--b);
+    background:color-mix(in srgb,var(--b) 16%,var(--surface));
+  }
+  .camhint{
+    align-self:center;margin-bottom:6px;max-width:300px;text-align:center;
+    font-size:13px;line-height:1.45;color:#e6e9ef;
+    background:rgba(16,18,23,.6);border:1px solid rgba(255,255,255,.12);border-radius:12px;
+    padding:10px 14px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  }
+  .app.cam-on .cam{display:block}
+  .app.cam-on .empty{display:none}
+  .app.cam-on .topbar{background:linear-gradient(180deg,rgba(8,9,12,.78),rgba(8,9,12,0))}
+  .app.cam-on .stream{
+    justify-content:flex-end;padding-top:40px;
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 24%,#000 100%);
+            mask-image:linear-gradient(to bottom,transparent 0,#000 24%,#000 100%);
+  }
+  .app.cam-on .turn{
+    background:rgba(17,19,24,.52);
+    -webkit-backdrop-filter:blur(13px) saturate(1.35);
+            backdrop-filter:blur(13px) saturate(1.35);
+    box-shadow:0 6px 22px rgba(0,0,0,.28);
+  }
+  .app.cam-on .turn__src{color:#ccd2dd}
+  .app.cam-on .dock{
+    background:linear-gradient(180deg,rgba(8,9,12,0),rgba(8,9,12,.86) 46%,rgba(8,9,12,.97));
+  }
+
   @media (prefers-reduced-motion:reduce){
     *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
     .empty__bars span{transform:none}
@@ -252,6 +322,7 @@
 </head>
 <body>
 <div class="app">
+  <video id="cam" class="cam" autoplay playsinline muted></video>
 
   <header class="topbar">
     <div class="brand">
@@ -292,8 +363,9 @@
     <div class="empty" id="empty">
       <div class="empty__bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
       <h2>Hold a conversation across languages</h2>
-      <p>Tap a language below and start talking. Parley captions what you say and speaks the translation aloud for the other person.</p>
+      <p>Tap a language and talk — or type a phrase below. Parley captions it, translates, and speaks the translation aloud for the other person.</p>
     </div>
+    <div class="camhint" id="camhint" style="display:none">Point the camera at whoever’s speaking, then tap their language to subtitle them.</div>
   </main>
 
   <div class="dock">
@@ -302,6 +374,12 @@
     <div class="toolrow">
       <button class="toggle" id="aloud" aria-pressed="true">
         <span class="toggle__sw"></span>Speak aloud
+      </button>
+      <button class="iconbtn" id="camBtn" aria-pressed="false" title="Camera" aria-label="Turn camera on">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h2l1.6-2h6.8L19 6h0a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.5" r="3.2"/></svg>
+      </button>
+      <button class="iconbtn" id="flipBtn" title="Flip camera" aria-label="Flip camera" hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 7H20V2.5"/><path d="M20 7A8.2 8.2 0 0 0 5.3 6"/><path d="M8.5 17H4v4.5"/><path d="M4 17a8.2 8.2 0 0 0 14.7 1"/></svg>
       </button>
       <button class="ghost" id="clear" hidden>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V5h6v2M7 7l1 12h8l1-12"/></svg>
@@ -319,6 +397,14 @@
         <svg class="mic__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
         <span class="mic__label" id="labelB">Español</span>
         <span class="mic__sub" id="subB">Tap to talk</span>
+      </button>
+    </div>
+
+    <div class="composer">
+      <button class="composer__lang composer__lang--a" id="composeLang" title="Switch the language you’re typing in">EN</button>
+      <input class="composer__input" id="composeInput" type="text" inputmode="text" autocomplete="off" autocapitalize="sentences" placeholder="Type a phrase…" />
+      <button class="composer__send" id="composeSend" aria-label="Translate and speak">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
       </button>
     </div>
   </div>
@@ -377,7 +463,8 @@ const selA=$("selA"), selB=$("selB"), micA=$("micA"), micB=$("micB"),
       labelA=$("labelA"), labelB=$("labelB"), subA=$("subA"), subB=$("subB"),
       stream=$("stream"), empty=$("empty"), banner=$("banner"),
       statusEl=$("status"), statusText=$("statusText"),
-      aloudBtn=$("aloud"), clearBtn=$("clear"), meter=$("meter");
+      aloudBtn=$("aloud"), clearBtn=$("clear"), meter=$("meter"),
+      composeInput=$("composeInput"), composeLang=$("composeLang"), composeSend=$("composeSend");
 
 /* ---------- populate language selects ---------- */
 function fillSelect(sel, selectedIdx){
@@ -392,8 +479,8 @@ function syncLabels(){
 }
 syncLabels();
 
-selA.addEventListener("change", ()=>{ state.a = LANGS[+selA.value]; clampSame("a"); syncLabels(); });
-selB.addEventListener("change", ()=>{ state.b = LANGS[+selB.value]; clampSame("b"); syncLabels(); });
+selA.addEventListener("change", ()=>{ state.a = LANGS[+selA.value]; clampSame("a"); syncLabels(); setComposeLang(); });
+selB.addEventListener("change", ()=>{ state.b = LANGS[+selB.value]; clampSame("b"); syncLabels(); setComposeLang(); });
 
 // don't allow both sides to be the same language
 function clampSame(changed){
@@ -414,28 +501,22 @@ $("swap").addEventListener("click", ()=>{
   selA.value = String(LANGS.indexOf(state.a));
   selB.value = String(LANGS.indexOf(state.b));
   syncLabels();
+  setComposeLang();
 });
 
 /* ---------- capability status ---------- */
 function setStatus(){
   let st="ready", text="Ready", note="";
   if(!hasSR){
-    st="warn"; text="Speech needs Chrome";
-    note="Speech input isn't available in this browser. Open Parley in Chrome or Edge (desktop or Android) to talk.";
-  } else if(!hasMT){
-    st="warn"; text="Translation off";
-    note="On-device translation needs Chrome 138+ with built-in AI. You can still see live captions of your own speech; translation is unavailable here.";
-  } else {
-    note="";
+    st="warn"; text="Type to talk";
+    note="Voice input isn’t available in this browser (it works in Chrome, Edge, and Safari, including iPhone). You can type phrases below — translation and spoken output work everywhere.";
+    micA.disabled = micB.disabled = true;
+    subA.textContent = subB.textContent = "Type below";
   }
   statusEl.dataset.state = st;
   statusText.textContent = text;
   if(note){ banner.innerHTML = note; banner.classList.add("show"); }
   else banner.classList.remove("show");
-
-  const disabled = !hasSR;
-  micA.disabled = micB.disabled = disabled;
-  if(disabled){ subA.textContent = subB.textContent = "Unavailable"; }
 }
 statusEl.addEventListener("click", ()=> banner.classList.toggle("show"));
 setStatus();
@@ -453,6 +534,7 @@ clearBtn.addEventListener("click", ()=>{
   stream.querySelectorAll(".turn").forEach(n=>n.remove());
   empty.style.display="";
   clearBtn.hidden = true;
+  updateCamHint();
 });
 
 /* ---------- translation ---------- */
@@ -475,11 +557,85 @@ async function getTranslator(src, tgt){
   return inst;
 }
 
+/* ---------- translation engine ----------
+   Order: on-device (Chrome 138+, free/offline/private) → cloud fallback
+   (works in EVERY browser). Swap cloud providers below without touching
+   the rest of the app. */
+const TRANSLATE = {
+  provider: "mymemory",   // "mymemory" (no key) | "libre" | "google" | "custom"
+  libreUrl:  "https://libretranslate.com/translate",
+  libreKey:  "",
+  googleKey: "",          // client-side keys are exposed — restrict it, or use "custom"
+  customUrl: ""           // your own backend: POST {text,source,target} -> {translatedText}
+};
+
+function mmCode(c){ return c === "zh" ? "zh-CN" : c; }
+function decodeEntities(s){ const t=document.createElement("textarea"); t.innerHTML=s; return t.value; }
+
+async function mymemoryT(text, src, tgt){
+  const url = "https://api.mymemory.translated.net/get?q=" +
+              encodeURIComponent(text) + "&langpair=" + mmCode(src) + "|" + mmCode(tgt);
+  const r = await fetch(url);
+  if(!r.ok) throw { msg:`Translation service error (${r.status}).` };
+  const j = await r.json();
+  const out = j && j.responseData && j.responseData.translatedText || "";
+  if(!out || /MYMEMORY WARNING|INVALID TARGET|INVALID SOURCE/i.test(out))
+    throw { msg:"Free translation limit reached for now — add a provider key for unlimited use." };
+  return decodeEntities(out);
+}
+async function libreT(text, src, tgt){
+  const body = { q:text, source:src, target:tgt, format:"text" };
+  if(TRANSLATE.libreKey) body.api_key = TRANSLATE.libreKey;
+  const r = await fetch(TRANSLATE.libreUrl, { method:"POST",
+    headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+  if(!r.ok) throw { msg:`LibreTranslate error (${r.status}).` };
+  return (await r.json()).translatedText;
+}
+async function googleT(text, src, tgt){
+  const r = await fetch("https://translation.googleapis.com/language/translate/v2?key="+TRANSLATE.googleKey,
+    { method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ q:text, source:src, target:tgt, format:"text" }) });
+  const j = await r.json();
+  if(j.error) throw { msg:j.error.message };
+  return decodeEntities(j.data.translations[0].translatedText);
+}
+async function customT(text, src, tgt){
+  const r = await fetch(TRANSLATE.customUrl, { method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ text, source:src, target:tgt }) });
+  if(!r.ok) throw { msg:`Translation endpoint error (${r.status}).` };
+  const j = await r.json();
+  return j.translatedText ?? j.translation ?? j.result ?? "";
+}
+async function cloudTranslate(text, src, tgt){
+  if(TRANSLATE.provider === "libre")  return libreT(text, src, tgt);
+  if(TRANSLATE.provider === "google") return googleT(text, src, tgt);
+  if(TRANSLATE.provider === "custom") return customT(text, src, tgt);
+  return mymemoryT(text, src, tgt);
+}
+
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise((_, rej)=> setTimeout(()=> rej(new Error("timeout")), ms))
+  ]);
+}
+
 async function translate(text, src, tgt){
   if(src === tgt) return text;
-  if(!hasMT) throw { code:"engine", msg:"No on-device translator." };
-  const t = await getTranslator(src, tgt);
-  return await t.translate(text);
+  if(hasMT){
+    try{
+      // on-device path (Chrome 138+): instant/offline/private when the model
+      // is present. Capped by a timeout so a slow/absent model never blocks.
+      return await withTimeout((async ()=>{
+        const avail = await Translator.availability({ sourceLanguage:src, targetLanguage:tgt });
+        if(avail !== "available") throw new Error("not-ready");
+        const t = await getTranslator(src, tgt);
+        return await t.translate(text);
+      })(), 2500);
+    }catch(_){ /* not ready / unsupported / slow → use cloud */ }
+  }
+  return await cloudTranslate(text, src, tgt);
 }
 
 /* ---------- speech synthesis ---------- */
@@ -518,6 +674,7 @@ function newTurn(side){
     <div class="turn__dst pending">Listening…<span class="caret"></span></div>`;
   stream.appendChild(el);
   scrollToEnd();
+  updateCamHint();
   return el;
 }
 function scrollToEnd(){ stream.scrollTop = stream.scrollHeight; }
@@ -619,11 +776,6 @@ async function handleFinal(text, from, to){
   const dstEl = state.turnEl?.querySelector(".turn__dst");
   if(!dstEl) return;
 
-  if(!hasMT){
-    dstEl.classList.remove("pending");
-    dstEl.innerHTML = `<span class="turn__err">Translation unavailable in this browser.</span>`;
-    return;
-  }
   try{
     const piece = await translate(text, from.mt, to.mt);
     state.turnDst = (state.turnDst + " " + piece).trim();
@@ -731,6 +883,119 @@ function roundRect(ctx,x,y,w,h,r){
 // idle meter even before mic permission
 window.addEventListener("load", ()=>{ if(!meterCtx){ meterCtx = meter.getContext("2d"); sizeMeter(); drawMeter(); }});
 window.addEventListener("resize", ()=>{ if(meterCtx) sizeMeter(); });
+
+/* ---------- type-a-phrase composer (works in every browser) ---------- */
+let composeSide = "a";
+function setComposeLang(){
+  const l = composeSide === "a" ? state.a : state.b;
+  composeLang.textContent = l.short;
+  composeLang.classList.toggle("composer__lang--a", composeSide === "a");
+  composeLang.classList.toggle("composer__lang--b", composeSide === "b");
+  composeInput.placeholder = "Type in " + l.name + "…";
+}
+composeLang.addEventListener("click", ()=>{
+  composeSide = composeSide === "a" ? "b" : "a";
+  setComposeLang(); composeInput.focus();
+});
+
+async function sendTyped(){
+  const text = composeInput.value.trim();
+  if(!text) return;
+  if(state.side) stopTurn();                 // end any live mic turn first
+  composeInput.value = "";
+
+  const side = composeSide;
+  const from = side === "a" ? state.a : state.b;
+  const to   = side === "a" ? state.b : state.a;
+
+  const el = newTurn(side);
+  el.querySelector(".turn__src").textContent = text;
+  const dstEl = el.querySelector(".turn__dst");
+  dstEl.innerHTML = "Translating…";
+
+  try{
+    const piece = await translate(text, from.mt, to.mt);
+    dstEl.classList.remove("pending");
+    dstEl.textContent = piece;
+    speak(piece, to.tts);
+  }catch(err){
+    dstEl.classList.remove("pending");
+    dstEl.innerHTML = `<span class="turn__err">${err.msg || "Couldn’t translate that."}</span>`;
+  }
+}
+composeSend.addEventListener("click", sendTyped);
+composeInput.addEventListener("keydown", (e)=>{ if(e.key === "Enter"){ e.preventDefault(); sendTyped(); }});
+setComposeLang();
+
+/* ---------- camera (face-to-face video) ---------- */
+const app   = document.querySelector(".app");
+const camEl = $("cam"), camBtn = $("camBtn"), flipBtn = $("flipBtn"), camhint = $("camhint");
+const cam = { on:false, facing:"user", stream:null };
+
+function updateCamHint(){
+  if(!camhint) return;
+  const noTurns = !stream.querySelector(".turn");
+  camhint.style.display = (cam.on && noTurns) ? "" : "none";
+}
+
+function stopCamTracks(){
+  if(cam.stream){ cam.stream.getTracks().forEach(t=>t.stop()); cam.stream=null; }
+}
+
+async function startCamera(){
+  try{
+    stopCamTracks();
+    cam.stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ ideal: cam.facing }, width:{ ideal:1280 }, height:{ ideal:720 } },
+      audio:false
+    });
+    camEl.srcObject = cam.stream;
+    camEl.classList.toggle("mirror", cam.facing === "user");  // selfie view feels natural
+    cam.on = true;
+    app.classList.add("cam-on");
+    camBtn.classList.add("active");
+    camBtn.setAttribute("aria-pressed","true");
+    camBtn.setAttribute("aria-label","Turn camera off");
+    flipBtn.hidden = false;
+    banner.classList.remove("show");
+    updateCamHint();
+  }catch(err){ cameraError(err); }
+}
+
+function stopCamera(){
+  stopCamTracks();
+  camEl.srcObject = null;
+  cam.on = false;
+  app.classList.remove("cam-on");
+  camBtn.classList.remove("active");
+  camBtn.setAttribute("aria-pressed","false");
+  camBtn.setAttribute("aria-label","Turn camera on");
+  flipBtn.hidden = true;
+  updateCamHint();
+}
+
+function toggleCamera(){ cam.on ? stopCamera() : startCamera(); }
+
+async function flipCamera(){
+  cam.facing = cam.facing === "user" ? "environment" : "user";
+  await startCamera();   // restart stream with the other camera
+}
+
+function cameraError(err){
+  const n = (err && err.name) || "";
+  let msg = "Couldn’t start the camera.";
+  if(n==="NotAllowedError" || n==="SecurityError")
+    msg = "Camera access is off. Allow the camera, then tap the camera button. (Needs HTTPS or localhost.)";
+  else if(n==="NotFoundError")
+    msg = "No camera found on this device.";
+  else if(n==="NotReadableError")
+    msg = "The camera is in use by another app. Close it and try again.";
+  banner.innerHTML = msg;
+  banner.classList.add("show");
+}
+
+camBtn.addEventListener("click", toggleCamera);
+flipBtn.addEventListener("click", flipCamera);
 
 /* ---------- service worker ---------- */
 if("serviceWorker" in navigator){
