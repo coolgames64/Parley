@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Parley — real-time conversation translation</title>
+<meta name="description" content="Speak, see it captioned, and have the translation spoken back. Real-time, two-way conversation translation for face-to-face talks and meetings." />
+
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#16181D" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Parley" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="icon" href="icon-192.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --bg:#16181D;
+    --surface:#1E2128;
+    --surface-2:#262A33;
+    --surface-3:#2E333D;
+    --text:#EAEDF2;
+    --muted:#939BAB;
+    --faint:#666E7E;
+    --line:rgba(255,255,255,.08);
+    --line-2:rgba(255,255,255,.14);
+    --a:#FF7E6B;      /* voice A — coral  */
+    --a-dim:#7a4036;
+    --b:#45CDB6;      /* voice B — teal   */
+    --b-dim:#2c6359;
+    --live:#C7F25A;
+    --danger:#FF6B6B;
+    --r:18px;
+    --dock-h:auto;
+    font-synthesis:none;
+    -webkit-text-size-adjust:100%;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:Inter,system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+  button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:none}
+  select{font-family:inherit}
+
+  .app{
+    position:relative;
+    display:flex;flex-direction:column;
+    height:100dvh;
+    max-width:600px;margin:0 auto;
+    background:
+      radial-gradient(120% 60% at 50% -10%, rgba(255,126,107,.06), transparent 60%),
+      radial-gradient(120% 60% at 50% 110%, rgba(69,205,182,.06), transparent 60%),
+      var(--bg);
+    border-left:1px solid var(--line);border-right:1px solid var(--line);
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;align-items:center;gap:12px;
+    padding:max(14px,env(safe-area-inset-top)) 18px 12px;
+  }
+  .brand{display:flex;align-items:center;gap:11px;margin-right:auto}
+  .brand__mark{width:30px;height:30px;flex:none}
+  .brand__name{
+    font-family:"Bricolage Grotesque",sans-serif;
+    font-weight:700;font-size:23px;letter-spacing:-.02em;line-height:1;
+  }
+  .chip{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:7px 12px 7px 11px;border-radius:999px;
+    background:var(--surface);border:1px solid var(--line);
+    font-size:12.5px;font-weight:500;color:var(--muted);
+    white-space:nowrap;cursor:pointer;
+  }
+  .chip__dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+  .chip[data-state="ready"] .chip__dot{background:var(--b);box-shadow:0 0 0 4px rgba(69,205,182,.16)}
+  .chip[data-state="warn"]  .chip__dot{background:var(--a)}
+  .chip[data-state="ready"]{color:var(--text)}
+
+  /* ---------- language bar ---------- */
+  .langbar{
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;
+    padding:6px 16px 12px;
+  }
+  .lang{
+    position:relative;display:flex;align-items:center;gap:10px;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:11px 12px;min-width:0;
+  }
+  .lang::before{content:"";width:9px;height:9px;border-radius:50%;flex:none}
+  .lang--a::before{background:var(--a)}
+  .lang--b::before{background:var(--b)}
+  .lang select{
+    appearance:none;-webkit-appearance:none;background:transparent;border:none;
+    color:var(--text);font-size:15px;font-weight:600;letter-spacing:-.01em;
+    width:100%;padding-right:16px;outline:none;cursor:pointer;
+    text-overflow:ellipsis;
+  }
+  .lang::after{ /* caret */
+    content:"";position:absolute;right:13px;top:50%;width:7px;height:7px;
+    border-right:2px solid var(--faint);border-bottom:2px solid var(--faint);
+    transform:translateY(-65%) rotate(45deg);pointer-events:none;
+  }
+  .lang select option{background:var(--surface-2);color:var(--text)}
+  .swap{
+    width:40px;height:40px;border-radius:12px;flex:none;
+    background:var(--surface-2);border:1px solid var(--line);
+    display:grid;place-items:center;color:var(--muted);
+    transition:transform .35s cubic-bezier(.2,.9,.3,1.2),color .2s,background .2s;
+  }
+  .swap:hover{color:var(--text);background:var(--surface-3)}
+  .swap:active{transform:rotate(180deg)}
+
+  /* ---------- info banner ---------- */
+  .banner{
+    margin:0 16px 10px;padding:11px 13px;border-radius:12px;
+    background:rgba(255,126,107,.10);border:1px solid rgba(255,126,107,.28);
+    color:#ffd9d1;font-size:13px;line-height:1.45;display:none;
+  }
+  .banner.show{display:block}
+  .banner a{color:#fff;text-decoration:underline;text-underline-offset:2px}
+
+  /* ---------- stream ---------- */
+  .stream{
+    flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+    padding:6px 16px 18px;
+    display:flex;flex-direction:column;gap:14px;
+    scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent;
+  }
+  .stream::-webkit-scrollbar{width:8px}
+  .stream::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:8px}
+
+  .empty{
+    margin:auto;text-align:center;max-width:300px;padding:30px 0;color:var(--muted);
+  }
+  .empty__bars{display:flex;align-items:flex-end;justify-content:center;gap:5px;height:46px;margin-bottom:18px}
+  .empty__bars span{width:5px;border-radius:3px;background:var(--surface-3);animation:idleBob 1.6s ease-in-out infinite}
+  .empty__bars span:nth-child(1){height:40%;animation-delay:0s;background:var(--a)}
+  .empty__bars span:nth-child(2){height:75%;animation-delay:.12s}
+  .empty__bars span:nth-child(3){height:55%;animation-delay:.24s;background:var(--b)}
+  .empty__bars span:nth-child(4){height:95%;animation-delay:.36s}
+  .empty__bars span:nth-child(5){height:50%;animation-delay:.48s;background:var(--a)}
+  @keyframes idleBob{0%,100%{transform:scaleY(.55)}50%{transform:scaleY(1)}}
+  .empty h2{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:19px;color:var(--text);letter-spacing:-.01em;margin-bottom:8px}
+  .empty p{font-size:14px;line-height:1.5}
+
+  .turn{
+    max-width:90%;display:flex;flex-direction:column;gap:5px;
+    padding:13px 15px;border-radius:16px;position:relative;
+    animation:rise .26s cubic-bezier(.2,.8,.3,1) both;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .turn--a{align-self:flex-start;background:var(--surface);
+    border:1px solid var(--line);border-left:3px solid var(--a);
+    border-top-left-radius:6px}
+  .turn--b{align-self:flex-end;background:var(--surface);
+    border:1px solid var(--line);border-right:3px solid var(--b);
+    border-top-right-radius:6px;text-align:right}
+  .turn__meta{
+    font-size:11.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;
+    display:flex;align-items:center;gap:7px;
+  }
+  .turn--b .turn__meta{flex-direction:row-reverse}
+  .turn--a .turn__meta{color:var(--a)}
+  .turn--b .turn__meta{color:var(--b)}
+  .turn__src{font-size:14px;color:var(--muted);line-height:1.4;font-weight:400}
+  .turn__dst{font-size:21px;line-height:1.32;font-weight:600;letter-spacing:-.01em;color:var(--text)}
+  .turn__dst.pending{color:var(--faint)}
+  .turn__dst .caret{display:inline-block;width:2px;height:1em;background:currentColor;
+    margin-left:1px;vertical-align:-2px;animation:blink 1s step-end infinite;opacity:.7}
+  @keyframes blink{50%{opacity:0}}
+  .turn__err{font-size:12.5px;color:var(--danger)}
+
+  /* ---------- dock ---------- */
+  .dock{
+    padding:12px 16px max(14px,env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(22,24,29,0),rgba(22,24,29,.6) 40%,var(--bg));
+    display:flex;flex-direction:column;gap:12px;
+  }
+  .meter{width:100%;height:38px;display:block}
+
+  .toolrow{display:flex;align-items:center;gap:8px}
+  .toggle{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:7px 11px;border-radius:10px;
+    background:var(--surface);border:1px solid var(--line);
+    font-size:12.5px;font-weight:600;color:var(--muted);user-select:none;
+  }
+  .toggle[aria-pressed="true"]{color:var(--text);border-color:var(--line-2)}
+  .toggle__sw{width:30px;height:18px;border-radius:999px;background:var(--surface-3);position:relative;flex:none;transition:background .2s}
+  .toggle__sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--faint);transition:transform .2s,background .2s}
+  .toggle[aria-pressed="true"] .toggle__sw{background:var(--b-dim)}
+  .toggle[aria-pressed="true"] .toggle__sw::after{transform:translateX(12px);background:var(--b)}
+  .ghost{
+    margin-left:auto;padding:8px 10px;border-radius:10px;color:var(--muted);
+    font-size:12.5px;font-weight:600;border:1px solid transparent;display:inline-flex;align-items:center;gap:6px;
+  }
+  .ghost:hover{color:var(--text);background:var(--surface)}
+
+  .talk{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .mic{
+    --c:var(--a);
+    position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    padding:16px 10px;border-radius:16px;
+    background:var(--surface);border:1.5px solid var(--line);
+    transition:border-color .18s,background .18s,transform .1s;
+    min-height:74px;
+  }
+  .mic--b{--c:var(--b)}
+  .mic:active{transform:scale(.985)}
+  .mic:disabled{opacity:.4;cursor:not-allowed}
+  .mic__ico{width:22px;height:22px;color:var(--c)}
+  .mic__label{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:15px;letter-spacing:-.01em}
+  .mic__sub{font-size:11px;color:var(--muted);font-weight:500;letter-spacing:.01em}
+  .mic[aria-pressed="true"]{
+    border-color:var(--c);
+    background:color-mix(in srgb,var(--c) 14%,var(--surface));
+  }
+  .mic[aria-pressed="true"] .mic__sub{color:var(--c)}
+  .mic[aria-pressed="true"]::before{
+    content:"";position:absolute;inset:-1.5px;border-radius:16px;border:1.5px solid var(--c);
+    animation:halo 1.4s ease-out infinite;
+  }
+  @keyframes halo{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.05)}}
+  .mic[aria-pressed="true"] .mic__ico{animation:micpulse 1.1s ease-in-out infinite}
+  @keyframes micpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+
+  :focus-visible{outline:2px solid var(--b);outline-offset:2px;border-radius:8px}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+    .empty__bars span{transform:none}
+  }
+  @media (max-width:380px){
+    .turn__dst{font-size:19px}
+    .mic__label{font-size:14px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true">
+        <rect x="14" y="20" width="58" height="40" rx="16" fill="#FF7E6B" transform="rotate(-7 43 40)"/>
+        <path d="M28 54 l-8 14 l20 -8 z" fill="#FF7E6B" transform="rotate(-7 43 40)"/>
+        <rect x="34" y="40" width="56" height="40" rx="16" fill="#45CDB6" transform="rotate(7 62 60)"/>
+        <path d="M50 74 l-6 14 l18 -7 z" fill="#45CDB6" transform="rotate(7 62 60)"/>
+        <rect x="32" y="38" width="60" height="44" rx="18" fill="#16181D" transform="rotate(7 62 60)"/>
+        <rect x="34" y="40" width="56" height="40" rx="16" fill="#45CDB6" transform="rotate(7 62 60)"/>
+        <path d="M50 74 l-6 14 l18 -7 z" fill="#45CDB6" transform="rotate(7 62 60)"/>
+      </svg>
+      <span class="brand__name">Parley</span>
+    </div>
+    <button class="chip" id="status" data-state="checking" title="Capability status">
+      <span class="chip__dot"></span><span id="statusText">Checking…</span>
+    </button>
+  </header>
+
+  <div class="langbar">
+    <label class="lang lang--a">
+      <select id="selA" aria-label="Your language"></select>
+    </label>
+    <button class="swap" id="swap" title="Swap languages" aria-label="Swap languages">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 4 L3 8 L7 12"/><path d="M3 8 H17"/>
+        <path d="M17 20 L21 16 L17 12"/><path d="M21 16 H7"/>
+      </svg>
+    </button>
+    <label class="lang lang--b">
+      <select id="selB" aria-label="Other language"></select>
+    </label>
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <main class="stream" id="stream" aria-live="polite" aria-label="Conversation">
+    <div class="empty" id="empty">
+      <div class="empty__bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <h2>Hold a conversation across languages</h2>
+      <p>Tap a language below and start talking. Parley captions what you say and speaks the translation aloud for the other person.</p>
+    </div>
+  </main>
+
+  <div class="dock">
+    <canvas class="meter" id="meter" aria-hidden="true"></canvas>
+
+    <div class="toolrow">
+      <button class="toggle" id="aloud" aria-pressed="true">
+        <span class="toggle__sw"></span>Speak aloud
+      </button>
+      <button class="ghost" id="clear" hidden>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V5h6v2M7 7l1 12h8l1-12"/></svg>
+        Clear
+      </button>
+    </div>
+
+    <div class="talk">
+      <button class="mic mic--a" id="micA" aria-pressed="false">
+        <svg class="mic__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <span class="mic__label" id="labelA">English</span>
+        <span class="mic__sub" id="subA">Tap to talk</span>
+      </button>
+      <button class="mic mic--b" id="micB" aria-pressed="false">
+        <svg class="mic__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        <span class="mic__label" id="labelB">Español</span>
+        <span class="mic__sub" id="subB">Tap to talk</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Parley — real-time conversation translation
+   Speech in (Web Speech API) → translate (on-device Translator
+   API) → caption + speak back (Speech Synthesis API).
+   ============================================================ */
+
+const LANGS = [
+  { name:"English",            short:"EN", rec:"en-US", mt:"en", tts:"en-US" },
+  { name:"Español",            short:"ES", rec:"es-ES", mt:"es", tts:"es-ES" },
+  { name:"Français",           short:"FR", rec:"fr-FR", mt:"fr", tts:"fr-FR" },
+  { name:"Deutsch",            short:"DE", rec:"de-DE", mt:"de", tts:"de-DE" },
+  { name:"Italiano",           short:"IT", rec:"it-IT", mt:"it", tts:"it-IT" },
+  { name:"Português",          short:"PT", rec:"pt-BR", mt:"pt", tts:"pt-BR" },
+  { name:"中文 (简体)",         short:"ZH", rec:"zh-CN", mt:"zh", tts:"zh-CN" },
+  { name:"日本語",              short:"JA", rec:"ja-JP", mt:"ja", tts:"ja-JP" },
+  { name:"한국어",              short:"KO", rec:"ko-KR", mt:"ko", tts:"ko-KR" },
+  { name:"العربية",            short:"AR", rec:"ar-SA", mt:"ar", tts:"ar-SA" },
+  { name:"हिन्दी",               short:"HI", rec:"hi-IN", mt:"hi", tts:"hi-IN" },
+  { name:"Русский",            short:"RU", rec:"ru-RU", mt:"ru", tts:"ru-RU" },
+  { name:"Nederlands",         short:"NL", rec:"nl-NL", mt:"nl", tts:"nl-NL" },
+  { name:"Türkçe",             short:"TR", rec:"tr-TR", mt:"tr", tts:"tr-TR" },
+  { name:"Polski",             short:"PL", rec:"pl-PL", mt:"pl", tts:"pl-PL" },
+  { name:"Tiếng Việt",         short:"VI", rec:"vi-VN", mt:"vi", tts:"vi-VN" },
+  { name:"Bahasa Indonesia",   short:"ID", rec:"id-ID", mt:"id", tts:"id-ID" },
+  { name:"Українська",         short:"UK", rec:"uk-UA", mt:"uk", tts:"uk-UA" },
+];
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const synth = window.speechSynthesis;
+const hasSR = !!SR;
+const hasMT = ("Translator" in self);
+const hasTTS = !!synth;
+
+const state = {
+  a: LANGS[0],
+  b: LANGS[1],
+  side: null,        // 'a' | 'b' while listening
+  aloud: true,
+  rec: null,
+  turnEl: null,      // current bubble
+  turnSrc: "",       // accumulated source text this turn
+  turnDst: "",       // accumulated translated text this turn
+  micStream: null,
+};
+const translators = {};   // cache: "en->es" -> {promise|instance}
+
+/* ---------- elements ---------- */
+const $ = id => document.getElementById(id);
+const selA=$("selA"), selB=$("selB"), micA=$("micA"), micB=$("micB"),
+      labelA=$("labelA"), labelB=$("labelB"), subA=$("subA"), subB=$("subB"),
+      stream=$("stream"), empty=$("empty"), banner=$("banner"),
+      statusEl=$("status"), statusText=$("statusText"),
+      aloudBtn=$("aloud"), clearBtn=$("clear"), meter=$("meter");
+
+/* ---------- populate language selects ---------- */
+function fillSelect(sel, selectedIdx){
+  sel.innerHTML = LANGS.map((l,i)=>`<option value="${i}">${l.name}</option>`).join("");
+  sel.value = String(selectedIdx);
+}
+fillSelect(selA, 0);
+fillSelect(selB, 1);
+
+function syncLabels(){
+  labelA.textContent = state.a.name; labelB.textContent = state.b.name;
+}
+syncLabels();
+
+selA.addEventListener("change", ()=>{ state.a = LANGS[+selA.value]; clampSame("a"); syncLabels(); });
+selB.addEventListener("change", ()=>{ state.b = LANGS[+selB.value]; clampSame("b"); syncLabels(); });
+
+// don't allow both sides to be the same language
+function clampSame(changed){
+  if(state.a === state.b){
+    if(changed==="a"){
+      const alt = LANGS.find(l=>l!==state.a) ;
+      state.b = alt; selB.value = String(LANGS.indexOf(alt));
+    }else{
+      const alt = LANGS.find(l=>l!==state.b);
+      state.a = alt; selA.value = String(LANGS.indexOf(alt));
+    }
+  }
+}
+
+$("swap").addEventListener("click", ()=>{
+  if(state.side) stopTurn();
+  [state.a, state.b] = [state.b, state.a];
+  selA.value = String(LANGS.indexOf(state.a));
+  selB.value = String(LANGS.indexOf(state.b));
+  syncLabels();
+});
+
+/* ---------- capability status ---------- */
+function setStatus(){
+  let st="ready", text="Ready", note="";
+  if(!hasSR){
+    st="warn"; text="Speech needs Chrome";
+    note="Speech input isn't available in this browser. Open Parley in Chrome or Edge (desktop or Android) to talk.";
+  } else if(!hasMT){
+    st="warn"; text="Translation off";
+    note="On-device translation needs Chrome 138+ with built-in AI. You can still see live captions of your own speech; translation is unavailable here.";
+  } else {
+    note="";
+  }
+  statusEl.dataset.state = st;
+  statusText.textContent = text;
+  if(note){ banner.innerHTML = note; banner.classList.add("show"); }
+  else banner.classList.remove("show");
+
+  const disabled = !hasSR;
+  micA.disabled = micB.disabled = disabled;
+  if(disabled){ subA.textContent = subB.textContent = "Unavailable"; }
+}
+statusEl.addEventListener("click", ()=> banner.classList.toggle("show"));
+setStatus();
+
+/* ---------- aloud toggle ---------- */
+aloudBtn.addEventListener("click", ()=>{
+  state.aloud = !state.aloud;
+  aloudBtn.setAttribute("aria-pressed", String(state.aloud));
+  if(!state.aloud && synth) synth.cancel();
+});
+
+/* ---------- clear ---------- */
+clearBtn.addEventListener("click", ()=>{
+  if(state.side) stopTurn();
+  stream.querySelectorAll(".turn").forEach(n=>n.remove());
+  empty.style.display="";
+  clearBtn.hidden = true;
+});
+
+/* ---------- translation ---------- */
+async function getTranslator(src, tgt){
+  const key = src+"->"+tgt;
+  if(translators[key]) return translators[key];
+  const avail = await Translator.availability({ sourceLanguage:src, targetLanguage:tgt });
+  if(avail === "unavailable"){ throw { code:"pair", msg:`${src}→${tgt} isn't supported on-device.` }; }
+  const inst = await Translator.create({
+    sourceLanguage:src, targetLanguage:tgt,
+    monitor(m){ m.addEventListener("downloadprogress", e=>{
+      const pct = Math.round((e.loaded||0)*100);
+      if(state.turnEl){
+        const dst = state.turnEl.querySelector(".turn__dst");
+        if(dst && state.turnDst==="") dst.innerHTML = `Downloading language model… ${pct}%`;
+      }
+    }); }
+  });
+  translators[key] = inst;
+  return inst;
+}
+
+async function translate(text, src, tgt){
+  if(src === tgt) return text;
+  if(!hasMT) throw { code:"engine", msg:"No on-device translator." };
+  const t = await getTranslator(src, tgt);
+  return await t.translate(text);
+}
+
+/* ---------- speech synthesis ---------- */
+let voices = [];
+function loadVoices(){ voices = synth ? synth.getVoices() : []; }
+if(synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
+function pickVoice(lang){
+  if(!voices.length) loadVoices();
+  const base = lang.split("-")[0].toLowerCase();
+  return voices.find(v=>v.lang.toLowerCase()===lang.toLowerCase())
+      || voices.find(v=>v.lang.toLowerCase().startsWith(base))
+      || null;
+}
+function speak(text, ttsLang){
+  if(!state.aloud || !synth || !text) return;
+  try{
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = ttsLang;
+    const v = pickVoice(ttsLang); if(v) u.voice = v;
+    u.rate = 1; u.pitch = 1;
+    synth.speak(u);
+  }catch(_){}
+}
+
+/* ---------- transcript bubbles ---------- */
+function newTurn(side){
+  empty.style.display = "none";
+  clearBtn.hidden = false;
+  const from = side==="a" ? state.a : state.b;
+  const el = document.createElement("div");
+  el.className = "turn turn--"+side;
+  el.innerHTML = `
+    <div class="turn__meta"><span class="dotm"></span>${from.name}</div>
+    <div class="turn__src"></div>
+    <div class="turn__dst pending">Listening…<span class="caret"></span></div>`;
+  stream.appendChild(el);
+  scrollToEnd();
+  return el;
+}
+function scrollToEnd(){ stream.scrollTop = stream.scrollHeight; }
+
+/* ---------- recognition / turn lifecycle ---------- */
+async function ensureMicMeter(){
+  if(state.micStream) return;
+  try{
+    state.micStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    startMeter(state.micStream);
+  }catch(_){ /* meter is non-essential */ }
+}
+
+function startTurn(side){
+  if(!hasSR) return;
+  if(state.side === side){ stopTurn(); return; }   // tapping active button stops
+  if(state.side) stopTurn();                       // switch sides
+
+  state.side = side;
+  state.turnSrc = ""; state.turnDst = "";
+  state.turnEl = newTurn(side);
+  setMicUI();
+  ensureMicMeter();
+
+  const from = side==="a" ? state.a : state.b;
+  const to   = side==="a" ? state.b : state.a;
+
+  const rec = new SR();
+  rec.lang = from.rec;
+  rec.continuous = true;
+  rec.interimResults = true;
+  state.rec = rec;
+
+  let interim = "";
+  rec.onresult = (e)=>{
+    interim = "";
+    for(let i=e.resultIndex; i<e.results.length; i++){
+      const r = e.results[i];
+      const txt = r[0].transcript;
+      if(r.isFinal){ handleFinal(txt.trim(), from, to); }
+      else interim += txt;
+    }
+    renderSrc(interim);
+  };
+  rec.onerror = (e)=>{
+    if(e.error === "no-speech") return;
+    if(e.error === "aborted")   return;
+    if(e.error === "not-allowed" || e.error === "service-not-allowed"){
+      showTurnError("Microphone access is off. Allow the mic, then tap to talk.");
+      stopTurn(); return;
+    }
+    showTurnError("Speech error: "+e.error);
+  };
+  rec.onend = ()=>{
+    // Chrome ends recognition periodically; restart while the turn is active.
+    if(state.side === side && state.rec === rec){
+      try{ rec.start(); }catch(_){}
+    }
+  };
+  try{ rec.start(); }
+  catch(_){ /* already started */ }
+}
+
+function stopTurn(){
+  const rec = state.rec;
+  state.side = null; state.rec = null;
+  if(rec){ try{ rec.onend=null; rec.stop(); }catch(_){} }
+  setMicUI();
+  // finalise bubble: if nothing captured, drop it
+  if(state.turnEl){
+    if(!state.turnSrc.trim() && !state.turnEl.querySelector(".turn__err")){
+      state.turnEl.remove();
+    }else{
+      const dst = state.turnEl.querySelector(".turn__dst");
+      if(dst){ dst.querySelector(".caret")?.remove(); }
+      // speak the full translated turn aloud (mic is now off → no feedback)
+      if(state.turnDst.trim()){
+        const to = lastTo; speak(state.turnDst.trim(), to ? to.tts : "en-US");
+      }
+    }
+  }
+  state.turnEl = null;
+  if(!stream.querySelector(".turn")){ empty.style.display=""; clearBtn.hidden=true; }
+}
+
+let lastTo = null;
+function renderSrc(interim){
+  if(!state.turnEl) return;
+  const srcEl = state.turnEl.querySelector(".turn__src");
+  srcEl.textContent = (state.turnSrc + " " + interim).trim();
+  scrollToEnd();
+}
+
+async function handleFinal(text, from, to){
+  if(!text) return;
+  lastTo = to;
+  state.turnSrc = (state.turnSrc + " " + text).trim();
+  renderSrc("");
+  const dstEl = state.turnEl?.querySelector(".turn__dst");
+  if(!dstEl) return;
+
+  if(!hasMT){
+    dstEl.classList.remove("pending");
+    dstEl.innerHTML = `<span class="turn__err">Translation unavailable in this browser.</span>`;
+    return;
+  }
+  try{
+    const piece = await translate(text, from.mt, to.mt);
+    state.turnDst = (state.turnDst + " " + piece).trim();
+    dstEl.classList.remove("pending");
+    dstEl.textContent = state.turnDst;
+    // keep a live caret while still listening
+    if(state.side){ const c=document.createElement("span"); c.className="caret"; dstEl.appendChild(c); }
+    scrollToEnd();
+  }catch(err){
+    dstEl.classList.remove("pending");
+    dstEl.innerHTML = `<span class="turn__err">${err.msg || "Couldn’t translate that."}</span>`;
+  }
+}
+
+function showTurnError(msg){
+  const dstEl = state.turnEl?.querySelector(".turn__dst");
+  if(dstEl){ dstEl.classList.remove("pending"); dstEl.innerHTML = `<span class="turn__err">${msg}</span>`; }
+}
+
+function setMicUI(){
+  const a = state.side==="a", b = state.side==="b";
+  micA.setAttribute("aria-pressed", String(a));
+  micB.setAttribute("aria-pressed", String(b));
+  subA.textContent = a ? "Listening — tap to stop" : "Tap to talk";
+  subB.textContent = b ? "Listening — tap to stop" : "Tap to talk";
+}
+
+micA.addEventListener("click", ()=>startTurn("a"));
+micB.addEventListener("click", ()=>startTurn("b"));
+
+/* keyboard: space toggles last-used side, Esc stops */
+document.addEventListener("keydown",(e)=>{
+  if(e.target.tagName==="SELECT") return;
+  if(e.code==="Escape" && state.side){ e.preventDefault(); stopTurn(); }
+});
+
+/* ---------- live waveform meter (signature) ---------- */
+let meterCtx, analyser, freqData, rafId, dpr=Math.min(devicePixelRatio||1,2);
+const reduceMotion = matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+function sizeMeter(){
+  const w = meter.clientWidth, h = 38;
+  meter.width = w*dpr; meter.height = h*dpr;
+}
+function startMeter(streamObj){
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC();
+    const srcNode = ac.createMediaStreamSource(streamObj);
+    analyser = ac.createAnalyser();
+    analyser.fftSize = 128;
+    analyser.smoothingTimeConstant = 0.8;
+    srcNode.connect(analyser);
+    freqData = new Uint8Array(analyser.frequencyBinCount);
+    meterCtx = meter.getContext("2d");
+    sizeMeter();
+    drawMeter();
+  }catch(_){}
+}
+function drawMeter(){
+  if(!meterCtx){ return; }
+  const ctx = meterCtx;
+  const W = meter.width, H = meter.height, mid = H/2;
+  ctx.clearRect(0,0,W,H);
+
+  const active = state.side;
+  const color = active==="a" ? "#FF7E6B" : active==="b" ? "#45CDB6" : "#3a414c";
+  const bars = 34;
+  const gap = 4*dpr;
+  const bw = (W - gap*(bars-1)) / bars;
+
+  if(analyser && active){ analyser.getByteFrequencyData(freqData); }
+
+  for(let i=0;i<bars;i++){
+    let v;
+    if(analyser && active){
+      const idx = Math.floor(i/bars * freqData.length);
+      v = freqData[idx]/255;
+      v = Math.pow(v, 0.8);
+    }else{
+      // idle shimmer
+      v = reduceMotion ? 0.10
+        : 0.06 + 0.05*Math.abs(Math.sin(performance.now()/600 + i*0.5));
+    }
+    const bh = Math.max(2*dpr, v * (H*0.92));
+    const x = i*(bw+gap);
+    const r = Math.min(bw/2, 3*dpr);
+    roundRect(ctx, x, mid-bh/2, bw, bh, r);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = active ? (0.55 + 0.45*v) : 0.5;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  rafId = requestAnimationFrame(drawMeter);
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+// idle meter even before mic permission
+window.addEventListener("load", ()=>{ if(!meterCtx){ meterCtx = meter.getContext("2d"); sizeMeter(); drawMeter(); }});
+window.addEventListener("resize", ()=>{ if(meterCtx) sizeMeter(); });
+
+/* ---------- service worker ---------- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=> navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
