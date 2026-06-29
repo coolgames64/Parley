@@ -145,6 +145,14 @@
   .cbtn--hang:hover{background:#ff7575}
   .cbtn small{display:none}
 
+  .invitebar{position:relative;z-index:2;margin:12px 16px 0;padding:13px 14px;border-radius:14px;
+    background:rgba(17,19,24,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.14)}
+  .invitebar__txt{font-size:13px;color:#dfe3ea;margin-bottom:9px;line-height:1.4}
+  .invitebar__row{display:flex;gap:8px}
+  .invitebar__link{flex:1;min-width:0;height:42px;border-radius:10px;padding:0 12px;background:rgba(0,0,0,.35);
+    border:1px solid var(--line);color:var(--text);font-size:13px;outline:none}
+  .invitebar__copy{flex:none;padding:0 16px;height:42px;border-radius:10px;background:var(--b);color:#06231d;font-weight:700;font-size:13.5px}
+
   /* incoming */
   .incoming{position:fixed;inset:0;z-index:60;background:rgba(8,9,12,.82);backdrop-filter:blur(16px);
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:30px;text-align:center}
@@ -245,13 +253,43 @@
           </button>
         </div>
         <div class="err" id="callErr"></div>
-        <div class="hint">Both people need a Parley account. They'll get a call notification if they've added Parley to their Home Screen with notifications on; otherwise it rings when their Parley is open.</div>
+        <button class="btn btn--ghost" id="inviteBtn" style="height:46px;margin-top:10px;font-size:14.5px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+          Create an invite link instead
+        </button>
+        <div class="hint">Both people need a Parley account. They'll get a call notification if they've added Parley to their Home Screen with notifications on; otherwise it rings when their Parley is open. Or use an invite link — they join with just a name, no account.</div>
       </div>
       <div class="panel">
         <h2>Recent</h2>
         <div id="contactsList"><div class="empty-list">People you call will show up here.</div></div>
       </div>
     </div>
+  </div>
+
+  <!-- guest join (opened from an invite link, no account needed) -->
+  <div class="auth" id="joinView" hidden>
+    <div class="auth__head">
+      <div class="brand">
+        <svg class="brand__mark" viewBox="0 0 100 100" aria-hidden="true">
+          <rect x="14" y="20" width="58" height="40" rx="16" fill="#FF7E6B" transform="rotate(-7 43 40)"/>
+          <rect x="34" y="40" width="56" height="40" rx="16" fill="#16181D" transform="rotate(7 62 60)"/>
+          <rect x="34" y="40" width="56" height="40" rx="16" fill="#45CDB6" transform="rotate(7 62 60)"/>
+        </svg><span class="brand__name">Parley</span>
+      </div>
+      <h1 id="joinTitle">Join the call</h1>
+      <p id="joinBlurb">Enter your name and language to join — no account needed.</p>
+    </div>
+    <div class="field">
+      <label>Your name</label>
+      <input class="input" id="joinName" type="text" placeholder="Your name" autocomplete="name" />
+    </div>
+    <div class="field">
+      <label>Your language</label>
+      <select class="select" id="joinLang"></select>
+    </div>
+    <div class="err" id="joinErr"></div>
+    <button class="btn btn--primary" id="joinBtn">Join call</button>
+    <div class="auth__switch"><button id="joinCancel">Cancel</button></div>
   </div>
 
   <!-- call -->
@@ -261,6 +299,13 @@
     <div class="call__top">
       <div class="call__peer" id="callPeer">—</div>
       <div class="call__status" id="callStatus"><span class="dot"></span><span id="callStatusText">Connecting…</span></div>
+    </div>
+    <div class="invitebar" id="inviteBar" hidden>
+      <div class="invitebar__txt">Share this link — the call connects the moment they open it:</div>
+      <div class="invitebar__row">
+        <input class="invitebar__link" id="inviteLink" readonly />
+        <button class="invitebar__copy" id="inviteCopy">Copy</button>
+      </div>
     </div>
     <div class="captions" id="captions"></div>
     <div class="call__controls">
@@ -299,7 +344,7 @@
    ============================================================ */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
-         signInWithEmailAndPassword, signOut, updateProfile }
+         signInWithEmailAndPassword, signInAnonymously, signOut, updateProfile }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, collection, addDoc,
          query, where, onSnapshot, serverTimestamp, getDocs, limit, orderBy }
@@ -309,19 +354,27 @@ import { getMessaging, getToken, onMessage, isSupported as fcmSupported }
 
 /* ====== 1) PASTE YOUR FIREBASE CONFIG HERE ====== */
 const FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  storageBucket: "PASTE.appspot.com",
-  messagingSenderId: "PASTE_SENDER_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyBy6DCX9RAjsm1wLDjN9un85aCXnwlF1gw",
+  authDomain: "parley-aa602.firebaseapp.com",
+  projectId: "parley-aa602",
+  storageBucket: "parley-aa602.firebasestorage.app",
+  messagingSenderId: "572519231019",
+  appId: "1:572519231019:web:82f06e898d8ea02f74446e",
+  measurementId: "G-SHE52ZS9JM"
 };
 /* ====== 2) PASTE YOUR FCM "WEB PUSH CERTIFICATE" (VAPID) KEY ====== */
 const VAPID_KEY = "PASTE_VAPID_PUBLIC_KEY";
 
-/* WebRTC servers — Google STUN is free. For reliability across all
-   networks, add a TURN server (see README) to this list. */
-const RTC_CONFIG = { iceServers: [ { urls: "stun:stun.l.google.com:19302" } ] };
+/* WebRTC servers. STUN gets most connections through directly. The TURN
+   entries below relay media when a direct path isn't possible (strict NATs,
+   some carriers/office Wi‑Fi). The Open Relay servers are free but best‑effort —
+   for production, drop in your own (Metered/Twilio/coturn). See README. */
+const RTC_CONFIG = { iceServers: [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "turn:openrelay.metered.ca:80",  username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+] };
 
 /* ---------- languages (mt = translate code, rec = speech, tts = voice) ---------- */
 const LANGS = [
@@ -393,10 +446,13 @@ const state = {
   tts: true, micOn: true, camOn: true,
   call: null,         // active call session
   pendingCall: null,  // incoming call id awaiting accept (from notification deep link)
+  isGuest: false,     // joined via invite link without an account
+  joinId: null, joinHost: null,
 };
 
 /* fill language select */
 $("langSelect").innerHTML = LANGS.map((l,i)=>`<option value="${l.mt}">${l.name}</option>`).join("");
+$("joinLang").innerHTML  = LANGS.map((l)=>`<option value="${l.mt}">${l.name}</option>`).join("");
 
 /* ========================= Firebase init ========================= */
 const configFilled = !String(FIREBASE_CONFIG.apiKey).startsWith("PASTE");
@@ -421,18 +477,136 @@ async function initApp(){
   // deep link: opened from a call notification (?call=ID)
   const params = new URLSearchParams(location.search);
   if(params.get("call")) state.pendingCall = params.get("call");
+  const joinId = params.get("join");
+
+  if(joinId){
+    // Guest entry — no account required. Sign in anonymously so we can read the
+    // invite, then show the lightweight join screen.
+    state.joinId = joinId;
+    show("loadView");
+    try{
+      if(!auth.currentUser) await signInAnonymously(auth);
+      await presentJoinScreen(joinId);
+    }catch(e){ showJoinError("Couldn't open this invite — the link may be invalid."); }
+    return;  // guest flow drives its own UI
+  }
 
   onAuthStateChanged(auth, async (user)=>{
-    if(user){
+    if(state.joinId) return;                 // guest flow handles itself
+    if(user && !user.isAnonymous){
       state.user = user;
       await loadProfile(user);
       enterHome();
+    } else if(user && user.isAnonymous){
+      await signOut(auth);                   // stray guest session, no invite → reset
     } else {
       state.user = null; state.profile = null;
       show("authView"); setAuthMode("signin");
     }
   });
 }
+
+/* ---------- guest join (invite links) ---------- */
+async function presentJoinScreen(joinId){
+  const snap = await getDoc(doc(db,"calls",joinId));
+  if(!snap.exists()){ showJoinError("This invite link doesn't exist."); return; }
+  const d = snap.data();
+  if(d.status === "ended"){ showJoinError("This call has already ended."); return; }
+  state.joinHost = { name: d.callerName, lang: d.callerLang, uid: d.callerUid };
+  $("joinTitle").textContent = (d.callerName || "Someone") + " is inviting you";
+  $("joinErr").textContent = "";
+  if(state.profile){ $("joinName").value = state.profile.displayName; $("joinLang").value = state.profile.lang; }
+  show("joinView");
+}
+function showJoinError(msg){ $("joinErr").textContent = msg; show("joinView"); }
+$("joinCancel").onclick = ()=> location.replace(location.origin + location.pathname);
+$("joinBtn").onclick = joinAsGuest;
+
+async function joinAsGuest(){
+  if(!state.joinId) return;
+  const name = $("joinName").value.trim() || "Guest";
+  const lang = $("joinLang").value;
+  $("joinErr").textContent = "";
+  $("joinBtn").disabled = true;
+  state.isGuest = true;
+  const callRef = doc(db,"calls", state.joinId);
+  try{
+    await updateDoc(callRef, { calleeUid: auth.currentUser.uid, calleeName: name, calleeLang: lang, status: "joining" });
+  }catch(e){ $("joinErr").textContent = "Couldn't join — the call may have ended."; $("joinBtn").disabled=false; return; }
+
+  const host = state.joinHost || { name:"Host", lang:"en", uid:null };
+  const session = newSession({ displayName: host.name, lang: host.lang, uid: host.uid }, "callee");
+  session.callRef = callRef; session.myLang = lang; session.peerLang = host.lang;
+  state.call = session;
+  enterCallScreen(host.name, "Connecting…");
+  try{
+    session.local = await getLocalMedia(); $("localVideo").srcObject = session.local;
+    session.unsubDoc = onSnapshot(callRef, async (snap)=>{
+      const d = snap.data(); if(!d) return;
+      if(d.offer && !session.pc){
+        const pc = session.pc = new RTCPeerConnection(RTC_CONFIG);
+        wirePc(session); pc.ondatachannel = e=> wireDataChannel(session, e.channel);
+        session.local.getTracks().forEach(t=> pc.addTrack(t, session.local));
+        pc.onicecandidate = e=>{ if(e.candidate) addDoc(collection(callRef,"calleeCandidates"), e.candidate.toJSON()); };
+        await pc.setRemoteDescription(new RTCSessionDescription(d.offer));
+        const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+        await updateDoc(callRef, { answer:{ type:answer.type, sdp:answer.sdp }, status:"accepted" });
+        session.unsubCand = onSnapshot(collection(callRef,"callerCandidates"), s2=>{
+          s2.docChanges().forEach(ch=>{ if(ch.type==="added" && session.pc) pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())); });
+        });
+      }
+      if(d.status === "ended") endCall();
+    });
+  }catch(e){ failCall(e); }
+}
+
+/* ---------- host: create an invite link ---------- */
+async function createInviteCall(){
+  const callRef = doc(collection(db,"calls"));
+  const session = newSession({ displayName:"Guest", lang:"en" }, "caller");
+  session.callRef = callRef; session.offerSent = false;
+  state.call = session;
+  enterCallScreen("Invite link", "Waiting for someone to join…");
+  $("inviteLink").value = location.origin + location.pathname + "?join=" + callRef.id;
+  showOverlay("inviteBar", true);
+  try{
+    session.local = await getLocalMedia(); $("localVideo").srcObject = session.local;
+    await setDoc(callRef, {
+      callerUid: state.profile.uid, callerName: state.profile.displayName, callerLang: state.profile.lang,
+      calleeUid: null, status: "waiting", isLink: true, createdAt: serverTimestamp()
+    });
+    session.unsubDoc = onSnapshot(callRef, async (snap)=>{
+      const d = snap.data(); if(!d) return;
+      if(d.status === "joining" && d.calleeUid && !session.offerSent){
+        session.offerSent = true;
+        session.peer = { displayName: d.calleeName, lang: d.calleeLang, uid: d.calleeUid };
+        session.peerLang = d.calleeLang;
+        $("callPeer").textContent = d.calleeName || "Guest";
+        showOverlay("inviteBar", false);
+        setCallStatus("Connecting…", false);
+        const pc = session.pc = new RTCPeerConnection(RTC_CONFIG);
+        wirePc(session);
+        session.dc = pc.createDataChannel("captions"); wireDataChannel(session, session.dc);
+        session.local.getTracks().forEach(t=> pc.addTrack(t, session.local));
+        pc.onicecandidate = e=>{ if(e.candidate) addDoc(collection(callRef,"callerCandidates"), e.candidate.toJSON()); };
+        const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+        await updateDoc(callRef, { offer:{ type:offer.type, sdp:offer.sdp }, status:"ringing" });
+        session.unsubCand = onSnapshot(collection(callRef,"calleeCandidates"), s2=>{
+          s2.docChanges().forEach(ch=>{ if(ch.type==="added" && session.pc) pc.addIceCandidate(new RTCIceCandidate(ch.doc.data())); });
+        });
+      }
+      if(d.answer && session.pc && !session.pc.currentRemoteDescription){
+        session.pc.setRemoteDescription(new RTCSessionDescription(d.answer)); setCallStatus("Connected", true);
+      }
+      if(d.status === "ended") endCall();
+    });
+  }catch(e){ failCall(e); }
+}
+$("inviteBtn") && ($("inviteBtn").onclick = createInviteCall);
+$("inviteCopy") && ($("inviteCopy").onclick = async ()=>{
+  try{ await navigator.clipboard.writeText($("inviteLink").value); $("inviteCopy").textContent = "Copied"; setTimeout(()=> $("inviteCopy").textContent="Copy", 1500); }
+  catch(_){ $("inviteLink").select(); }
+});
 
 /* ========================= auth UI ========================= */
 function setAuthMode(mode){
@@ -788,6 +962,7 @@ function enterCallScreen(peerName, status){
   $("callPeer").textContent = peerName;
   setCallStatus(status, false);
   $("remoteVideo").srcObject = null;
+  showOverlay("inviteBar", false);
   state.micOn = true; state.camOn = true;
   $("micBtn").classList.remove("off"); $("camBtn").classList.remove("off");
   $("ttsBtn").classList.toggle("off", !state.tts);
@@ -816,16 +991,22 @@ $("ttsBtn").onclick = ()=>{
 };
 
 function endCall(){
-  const s = state.call; if(!s){ show("homeView"); return; }
+  const s = state.call;
   state.call = null;
-  try{ s.rec && (s.rec.onend=null, s.rec.stop()); }catch(_){}
-  try{ s.unsubDoc && s.unsubDoc(); }catch(_){}
-  try{ s.unsubCand && s.unsubCand(); }catch(_){}
-  try{ s.dc && s.dc.close(); }catch(_){}
-  try{ s.pc && s.pc.close(); }catch(_){}
-  try{ s.local && s.local.getTracks().forEach(t=>t.stop()); }catch(_){}
+  if(s){
+    try{ s.rec && (s.rec.onend=null, s.rec.stop()); }catch(_){}
+    try{ s.unsubDoc && s.unsubDoc(); }catch(_){}
+    try{ s.unsubCand && s.unsubCand(); }catch(_){}
+    try{ s.dc && s.dc.close(); }catch(_){}
+    try{ s.pc && s.pc.close(); }catch(_){}
+    try{ s.local && s.local.getTracks().forEach(t=>t.stop()); }catch(_){}
+  }
   if(synth) synth.cancel();
   $("remoteVideo").srcObject = null; $("localVideo").srcObject = null;
+  showOverlay("inviteBar", false);
+  if($("inviteBtn")) $("inviteBtn").disabled = false;
+  if($("joinBtn")) $("joinBtn").disabled = false;
+  if(state.isGuest){ location.replace(location.origin + location.pathname); return; }  // guests have no home
   show("homeView");
 }
 function failCall(e){

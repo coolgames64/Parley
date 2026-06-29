@@ -6,12 +6,13 @@ importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js
 importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
 
 firebase.initializeApp({
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  storageBucket: "PASTE.appspot.com",
-  messagingSenderId: "PASTE_SENDER_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyBy6DCX9RAjsm1wLDjN9un85aCXnwlF1gw",
+  authDomain: "parley-aa602.firebaseapp.com",
+  projectId: "parley-aa602",
+  storageBucket: "parley-aa602.firebasestorage.app",
+  messagingSenderId: "572519231019",
+  appId: "1:572519231019:web:82f06e898d8ea02f74446e",
+  measurementId: "G-SHE52ZS9JM"
 });
 
 const messaging = firebase.messaging();
