@@ -1,14 +1,14 @@
 {
-  "name": "Parley — Conversation Translator",
+  "name": "Parley — Translated Calls",
   "short_name": "Parley",
-  "description": "Speak, see it captioned, and have the translation spoken back. Real-time, two-way conversation translation for face-to-face talks and meetings.",
+  "description": "Call anyone and understand each other across languages — live translated video calls.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#16181D",
   "theme_color": "#16181D",
-  "categories": ["productivity", "utilities", "travel"],
+  "categories": ["productivity", "social", "utilities"],
   "lang": "en",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
