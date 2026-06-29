@@ -30,6 +30,12 @@ Cloud Function in `functions/` deployed (step 6).
 2. **Add a Web app** (the `</>` icon) → copy the `firebaseConfig` object it shows
    into `FIREBASE_CONFIG` in both `index.html` and `firebase-messaging-sw.js`.
 3. **Authentication** → *Get started* → enable **Email/Password**.
+   Also enable **Anonymous** (same screen) so people can join via an invite
+   link without creating an account, and use **Try Parley** (trial) mode.
+   *(Optional)* enable **Google** too if you want the "Continue with Google"
+   button to work. After deploying, also add your hosting domain under
+   *Authentication → Settings → Authorised domains* (`*.web.app`/`*.firebaseapp.com`
+   are already there; add a custom domain or your GitHub Pages domain if you use one).
 4. **Firestore Database** → *Create database* → start in *production mode*.
    Then paste the contents of `firestore.rules` into the **Rules** tab and publish
    (or deploy via CLI, step 6).
@@ -73,8 +79,16 @@ Parley open — you just don't get a notification when their app is closed.
 1. Open the deployed URL, **create an account**, and pick your language.
 2. Have the other person do the same on their device.
 3. Enter their email and tap **call** — their Parley rings (or notifies).
+   Or tap **Create an invite link** and send the link to anyone — they open it,
+   type a name and pick a language, and join the call **without an account**.
 4. On accept, you'll see each other and live‑translated captions; tap the speaker
    button to also hear the translation.
+
+### Invite links
+The host taps *Create an invite link*, shares the link, and waits on the call
+screen. Whoever opens the link joins as a guest (signed in anonymously behind the
+scenes) — no sign‑up. Good for calling someone once, or someone who'll never make
+an account. Requires **Anonymous** auth to be enabled (step 3).
 
 ### iPhone notes (important)
 - To receive **notifications**, the other person must **Add Parley to the Home
@@ -87,11 +101,14 @@ Parley open — you just don't get a notification when their app is closed.
 
 ---
 
-## Reliability: add a TURN server
+## Reliability: TURN servers
 
-Peer‑to‑peer connects directly on most networks using the free Google STUN server
-already configured. On stricter networks (some mobile carriers, corporate Wi‑Fi)
-a **TURN relay** is required. Add yours to `RTC_CONFIG` in `index.html`:
+Peer‑to‑peer connects directly on most networks using the free Google STUN server.
+On stricter networks (some mobile carriers, corporate Wi‑Fi) a **TURN relay** is
+required to connect at all. The app ships with the free **Open Relay** TURN servers
+already in `RTC_CONFIG` so it works out of the box on more networks — but those are
+**best‑effort and capacity‑limited**, so for anything real, replace them with your
+own in `index.html`:
 
 ```js
 const RTC_CONFIG = { iceServers: [
@@ -100,8 +117,8 @@ const RTC_CONFIG = { iceServers: [
 ]};
 ```
 
-Managed TURN options: Twilio Network Traversal, Metered, Cloudflare Calls, or
-self‑host **coturn**.
+Managed TURN options: **Metered** (free tier + an API for short‑lived credentials),
+**Twilio** Network Traversal, **Cloudflare Calls**, or self‑host **coturn**.
 
 ---
 
@@ -111,6 +128,29 @@ Same setup as the rest of Parley: on‑device translation is used automatically 
 Chrome when the language model is present, otherwise it falls back to a free
 cloud translator (no key). Swap providers in the `TRANSLATE` object at the top of
 the script (`mymemory` | `libre` | `google` | `custom`).
+
+### Languages & voices (important)
+A translated call has three parts, and they don't all support every language equally:
+- **Captions always work** for every supported pair — the translated text shows on
+  screen regardless of device.
+- **Spoken audio** only plays if the *listener's device* has a voice installed for
+  that language. If it doesn't, Parley now stays silent and shows a "captions only"
+  note instead of reading the text in the wrong voice (which is what made calls
+  sound like they "weren't translating"). To get spoken translation:
+  - **iPhone/iPad:** Settings → Accessibility → Spoken Content → Voices → add the language.
+  - **Mac:** System Settings → Accessibility → Spoken Content → System Voice → Manage Voices.
+- **Speech‑to‑text** (capturing what you say) needs a browser that supports it —
+  Safari, Chrome, and Edge do; Firefox does not.
+
+Tip: the two people on a call must have **different** languages set, or there's
+nothing to translate. Invite‑link guests are now defaulted to a language different
+from the host to avoid this.
+
+### Trial mode
+The sign‑in screen has **Try Parley without an account** — it signs in anonymously
+and drops you on the home screen so you can make calls and create invite links
+immediately. Trial users can call others and use invite links, but can't be called
+by *their* email until they create a real account (a banner offers the upgrade).
 
 ## Files
 

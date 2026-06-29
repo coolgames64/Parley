@@ -73,6 +73,12 @@
   .btn:disabled{opacity:.55;cursor:default}
   .auth__switch{text-align:center;font-size:13.5px;color:var(--muted)}
   .auth__switch button{color:var(--b);font-weight:600}
+  .or-divider{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:12.5px;margin:2px 0}
+  .or-divider::before,.or-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+  .banner{padding:11px 14px;border-radius:12px;background:rgba(69,205,182,.10);border:1px solid rgba(69,205,182,.30);
+    color:#bdeee3;font-size:13px;line-height:1.45;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start}
+  .banner b{color:#eafffb}
+  .banner button{color:var(--b);font-weight:700;white-space:nowrap}
   .err{color:var(--danger);font-size:13px;min-height:18px;line-height:1.4}
 
   /* ---------- home ---------- */
@@ -207,13 +213,15 @@
       <label>Your name</label>
       <input class="input" id="dispName" type="text" placeholder="e.g. Jake" autocomplete="name" />
     </div>
-    <div class="field">
-      <label>Email</label>
-      <input class="input" id="email" type="email" placeholder="you@example.com" autocomplete="email" />
-    </div>
-    <div class="field">
-      <label>Password</label>
-      <input class="input" id="password" type="password" placeholder="••••••••" autocomplete="current-password" />
+    <div id="emailPwFields" style="display:flex;flex-direction:column;gap:16px">
+      <div class="field">
+        <label>Email</label>
+        <input class="input" id="email" type="email" placeholder="you@example.com" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input class="input" id="password" type="password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
     </div>
     <div class="field" id="langField" hidden>
       <label>Your language</label>
@@ -221,7 +229,13 @@
     </div>
     <div class="err" id="authErr"></div>
     <button class="btn btn--primary" id="authBtn">Sign in</button>
+    <div class="or-divider" id="googleWrap"><span>or</span></div>
+    <button class="btn btn--ghost" id="googleBtn">
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 7.3 29.3 5.5 24 5.5 13.5 5.5 5 14 5 24.5s8.5 19 19 19 19-8.5 19-19c0-1.3-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M7.3 14.7l6.6 4.8C15.7 16 19.5 13.5 24 13.5c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 7.3 29.3 5.5 24 5.5 16.3 5.5 9.7 9.9 7.3 14.7z"/><path fill="#4CAF50" d="M24 43.5c5.2 0 9.9-1.8 13.4-4.8l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.6 39 16.2 43.5 24 43.5z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.5l6.2 5.2c-.4.4 6.6-4.8 6.6-14.2 0-1.3-.1-2.7-.4-4z"/></svg>
+      Continue with Google
+    </button>
     <div class="auth__switch" id="authSwitch">New here? <button id="toSignup">Create an account</button></div>
+    <div class="auth__switch" id="trialSwitch"><button id="toTrial">Try Parley without an account →</button></div>
   </div>
 
   <!-- home -->
@@ -344,7 +358,8 @@
    ============================================================ */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
-         signInWithEmailAndPassword, signInAnonymously, signOut, updateProfile }
+         signInWithEmailAndPassword, signInAnonymously, GoogleAuthProvider, signInWithPopup,
+         signOut, updateProfile }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, collection, addDoc,
          query, where, onSnapshot, serverTimestamp, getDocs, limit, orderBy }
@@ -433,7 +448,17 @@ let voices=[]; function loadVoices(){ voices = synth ? synth.getVoices() : []; }
 if(synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
 function pickVoice(lang){ if(!voices.length)loadVoices(); const base=lang.split("-")[0].toLowerCase();
   return voices.find(v=>v.lang.toLowerCase()===lang.toLowerCase()) || voices.find(v=>v.lang.toLowerCase().startsWith(base)) || null; }
-function speak(text, ttsLang){ if(!state.tts||!synth||!text) return; try{ synth.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang=ttsLang; const v=pickVoice(ttsLang); if(v)u.voice=v; synth.speak(u);}catch(_){}}
+function hasVoiceFor(lang){ return !!pickVoice(lang); }
+/* Speak the translation ONLY if the device actually has a voice for that
+   language. Otherwise stay silent — the caption already carries the meaning,
+   and forcing a wrong-language voice is what makes it sound like the original. */
+function speak(text, ttsLang){
+  if(!state.tts || !synth || !text) return false;
+  const v = pickVoice(ttsLang);
+  if(!v) return false;                       // no voice installed for this language
+  try{ synth.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang=ttsLang; u.voice=v; synth.speak(u); return true; }
+  catch(_){ return false; }
+}
 
 /* ========================= app state ========================= */
 const $ = id => document.getElementById(id);
@@ -448,6 +473,8 @@ const state = {
   pendingCall: null,  // incoming call id awaiting accept (from notification deep link)
   isGuest: false,     // joined via invite link without an account
   joinId: null, joinHost: null,
+  isTrial: false, pendingTrial: false, trialName: "", trialLang: "en",
+  newUserPending: null, creatingEmailProfile: false,
 };
 
 /* fill language select */
@@ -492,17 +519,35 @@ async function initApp(){
   }
 
   onAuthStateChanged(auth, async (user)=>{
-    if(state.joinId) return;                 // guest flow handles itself
-    if(user && !user.isAnonymous){
-      state.user = user;
-      await loadProfile(user);
-      enterHome();
-    } else if(user && user.isAnonymous){
-      await signOut(auth);                   // stray guest session, no invite → reset
-    } else {
-      state.user = null; state.profile = null;
+    if(state.joinId) return;                 // guest invite flow handles itself
+
+    if(!user){
+      state.user = null; state.profile = null; state.isTrial = false;
       show("authView"); setAuthMode("signin");
+      return;
     }
+
+    // Anonymous session: only valid as a "trial" the user started here.
+    if(user.isAnonymous){
+      if(state.isTrial || state.pendingTrial){
+        state.pendingTrial = false; state.isTrial = true;
+        state.profile = { uid:user.uid, displayName:(state.trialName||"You"), email:null, lang:(state.trialLang||"en"), trial:true };
+        enterHome();
+      } else {
+        await signOut(auth);                 // stray anon, no invite/trial → reset
+      }
+      return;
+    }
+
+    // Real account (email or Google).
+    state.user = user; state.isTrial = false;
+    const ref = doc(db,"users",user.uid);
+    const snap = await getDoc(ref);
+    if(snap.exists()){ state.profile = snap.data(); enterHome(); return; }
+    if(state.creatingEmailProfile) return;   // email signup is writing the profile; it calls enterHome itself
+    // New Google user (no profile yet) → ask for a language first.
+    state.newUserPending = { uid:user.uid, name:user.displayName || (user.email ? user.email.split("@")[0] : "You"), email:(user.email||"").toLowerCase() };
+    show("authView"); setAuthMode("finishGoogle");
   });
 }
 
@@ -513,9 +558,18 @@ async function presentJoinScreen(joinId){
   const d = snap.data();
   if(d.status === "ended"){ showJoinError("This call has already ended."); return; }
   state.joinHost = { name: d.callerName, lang: d.callerLang, uid: d.callerUid };
+  const hostLangName = langByMt(d.callerLang).name;
   $("joinTitle").textContent = (d.callerName || "Someone") + " is inviting you";
+  $("joinBlurb").innerHTML = "They speak <b style='color:var(--text)'>"+hostLangName+"</b>. Pick <b style='color:var(--text)'>your</b> language so you each hear the other in your own.";
   $("joinErr").textContent = "";
-  if(state.profile){ $("joinName").value = state.profile.displayName; $("joinLang").value = state.profile.lang; }
+  if(state.profile){
+    $("joinName").value = state.profile.displayName;
+    $("joinLang").value = state.profile.lang;
+  } else {
+    // default the guest to a language different from the host so translation
+    // actually has something to do (the #1 cause of "it didn't translate")
+    $("joinLang").value = (d.callerLang === "en") ? "zh" : "en";
+  }
   show("joinView");
 }
 function showJoinError(msg){ $("joinErr").textContent = msg; show("joinView"); }
@@ -609,48 +663,108 @@ $("inviteCopy") && ($("inviteCopy").onclick = async ()=>{
 });
 
 /* ========================= auth UI ========================= */
+// modes: "signin" | "signup" | "trial" | "finishGoogle"
 function setAuthMode(mode){
   state.mode = mode;
-  const signup = mode === "signup";
-  $("authTitle").textContent = signup ? "Create your account" : "Welcome back";
-  $("authBlurb").textContent  = signup ? "Pick your language so others can talk to you in theirs." : "Sign in to call anyone, in any language.";
-  $("authBtn").textContent    = signup ? "Create account" : "Sign in";
-  $("nameField").hidden = !signup;
-  $("langField").hidden = !signup;
-  $("authSwitch").innerHTML = signup
-    ? 'Already have an account? <button id="toSignin">Sign in</button>'
-    : 'New here? <button id="toSignup">Create an account</button>';
-  $("authErr").textContent = "";
-  const t = signup ? $("toSignin") : $("toSignup");
-  if(t) t.onclick = ()=> setAuthMode(signup ? "signin" : "signup");
-  $("password").setAttribute("autocomplete", signup ? "new-password" : "current-password");
+  const cfg = {
+    signin:      { title:"Welcome back",        blurb:"Sign in to call anyone, in any language.", btn:"Sign in",      name:false, emailpw:true,  lang:false, google:true,  trialLink:true },
+    signup:      { title:"Create your account", blurb:"Pick your language so others can talk to you in theirs.", btn:"Create account", name:true,  emailpw:true,  lang:true,  google:true,  trialLink:true },
+    trial:       { title:"Try Parley",          blurb:"No account needed. Make calls and invite links right away — create an account later to be callable by your email.", btn:"Start trial", name:true, emailpw:false, lang:true, google:false, trialLink:false },
+    finishGoogle:{ title:"One last thing",       blurb:"Pick your language so others can talk to you in theirs.", btn:"Continue", name:true, emailpw:false, lang:true, google:false, trialLink:false },
+  }[mode];
+
+  $("authTitle").textContent = cfg.title;
+  $("authBlurb").textContent = cfg.blurb;
+  $("authBtn").textContent   = cfg.btn;
+  $("nameField").hidden      = !cfg.name;
+  $("emailPwFields").hidden  = !cfg.emailpw;
+  $("langField").hidden      = !cfg.lang;
+  $("googleWrap").hidden     = !cfg.google;
+  $("googleBtn").hidden      = !cfg.google;
+  $("trialSwitch").hidden    = !cfg.trialLink;
+  $("authErr").textContent   = "";
+  $("authBtn").disabled = false;
+
+  // primary switch line
+  if(mode === "signup"){
+    $("authSwitch").hidden = false;
+    $("authSwitch").innerHTML = 'Already have an account? <button id="toSignin">Sign in</button>';
+    $("toSignin").onclick = ()=> setAuthMode("signin");
+  } else if(mode === "signin"){
+    $("authSwitch").hidden = false;
+    $("authSwitch").innerHTML = 'New here? <button id="toSignup">Create an account</button>';
+    $("toSignup").onclick = ()=> setAuthMode("signup");
+  } else { // trial / finishGoogle
+    $("authSwitch").hidden = false;
+    $("authSwitch").innerHTML = '<button id="toSignin2">Back to sign in</button>';
+    $("toSignin2").onclick = ()=>{ if(auth.currentUser && (state.isTrial||state.mode==="finishGoogle")) signOut(auth); else setAuthMode("signin"); };
+  }
+
+  if(mode === "finishGoogle" && state.newUserPending) $("dispName").value = state.newUserPending.name;
+  $("password").setAttribute("autocomplete", mode === "signup" ? "new-password" : "current-password");
 }
 $("authBtn").onclick = doAuth;
 $("password").addEventListener("keydown", e=>{ if(e.key==="Enter") doAuth(); });
+$("toTrial").onclick = ()=> setAuthMode("trial");
+$("googleBtn").onclick = doGoogle;
 
 async function doAuth(){
-  const email = $("email").value.trim();
-  const pw = $("password").value;
   const errEl = $("authErr"); errEl.textContent = "";
-  if(!email || !pw){ errEl.textContent = "Enter your email and password."; return; }
   $("authBtn").disabled = true;
   try{
+    if(state.mode === "trial"){
+      state.trialName = $("dispName").value.trim() || "You";
+      state.trialLang = $("langSelect").value;
+      state.pendingTrial = true;
+      await signInAnonymously(auth);            // router picks it up → trial home
+      return;
+    }
+    if(state.mode === "finishGoogle"){
+      const p = state.newUserPending; if(!p){ setAuthMode("signin"); return; }
+      const name = $("dispName").value.trim() || p.name;
+      const lang = $("langSelect").value;
+      await setDoc(doc(db,"users",p.uid), { uid:p.uid, displayName:name, email:p.email, lang, createdAt: serverTimestamp() });
+      state.profile = { uid:p.uid, displayName:name, email:p.email, lang };
+      state.newUserPending = null;
+      enterHome();
+      return;
+    }
+    // email/password
+    const email = $("email").value.trim();
+    const pw = $("password").value;
+    if(!email || !pw){ errEl.textContent = "Enter your email and password."; $("authBtn").disabled=false; return; }
     if(state.mode === "signup"){
       const name = $("dispName").value.trim() || email.split("@")[0];
       const lang = $("langSelect").value;
+      state.creatingEmailProfile = true;
       const cred = await createUserWithEmailAndPassword(auth, email, pw);
       await updateProfile(cred.user, { displayName: name });
-      await setDoc(doc(db,"users",cred.user.uid), {
-        uid: cred.user.uid, displayName: name, email: email.toLowerCase(),
-        lang, createdAt: serverTimestamp()
-      });
+      await setDoc(doc(db,"users",cred.user.uid), { uid:cred.user.uid, displayName:name, email:email.toLowerCase(), lang, createdAt: serverTimestamp() });
+      state.profile = { uid:cred.user.uid, displayName:name, email:email.toLowerCase(), lang };
+      state.creatingEmailProfile = false;
+      enterHome();
     } else {
-      await signInWithEmailAndPassword(auth, email, pw);
+      await signInWithEmailAndPassword(auth, email, pw);   // router takes over
     }
-    // onAuthStateChanged takes over from here
   }catch(e){
+    state.creatingEmailProfile = false;
     errEl.textContent = friendlyAuthError(e);
     $("authBtn").disabled = false;
+  }
+}
+
+async function doGoogle(){
+  $("authErr").textContent = "";
+  try{
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);   // router handles new-vs-existing profile
+  }catch(e){
+    const c = (e && e.code) || "";
+    if(c.includes("popup-closed") || c.includes("cancelled")) return;       // user dismissed
+    if(c.includes("operation-not-allowed")) $("authErr").textContent = "Google sign-in isn't enabled yet (turn it on in Firebase → Authentication).";
+    else if(c.includes("popup-blocked")) $("authErr").textContent = "Your browser blocked the Google popup — allow popups and try again.";
+    else if(c.includes("unauthorized-domain")) $("authErr").textContent = "This site isn't in Firebase's authorised domains yet (add it under Authentication → Settings).";
+    else $("authErr").textContent = "Google sign-in didn't work. Try again, or use email.";
   }
 }
 function friendlyAuthError(e){
@@ -680,20 +794,33 @@ let incomingUnsub = null;
 async function enterHome(){
   const p = state.profile;
   $("meName").textContent = p.displayName;
-  $("meLang").textContent = langByMt(p.lang).name;
+  $("meLang").textContent = langByMt(p.lang).name + (state.isTrial ? " · trial" : "");
   $("meAvatar").textContent = (p.displayName||"?").charAt(0).toUpperCase();
   show("homeView");
+  renderTrialBanner();
   renderContacts();
-  registerPush();          // ask for notification permission + store token
-  listenForIncoming();     // ring when a call doc targets me
+  if(!state.isTrial){
+    registerPush();          // ask for notification permission + store token
+    listenForIncoming();     // ring when a call doc targets me
+  }
   if(state.pendingCall){   // opened from a notification
     const id = state.pendingCall; state.pendingCall = null;
     const snap = await getDoc(doc(db,"calls",id));
     if(snap.exists() && snap.data().status==="ringing") presentIncoming(id, snap.data());
   }
 }
+function renderTrialBanner(){
+  const el = $("pushNote");
+  if(state.isTrial){
+    el.innerHTML = '<div class="banner"><div><b>You\'re trying Parley.</b> Calls and invite links work now. People can\'t call <i>you</i> by email until you make an account.</div><button id="trialUpgrade">Sign up</button></div>';
+    $("trialUpgrade").onclick = ()=> signOut(auth);   // returns to the sign-in/up screen
+  } else {
+    el.innerHTML = "";
+  }
+}
 $("signOutBtn").onclick = async ()=>{
   if(incomingUnsub) incomingUnsub();
+  state.isTrial = false;
   await signOut(auth);
 };
 
@@ -922,10 +1049,20 @@ async function receiveCaption(session, m){
   if(m.final){
     interimThemEl = null;
     addCaption("them", piece, m.text, false);
-    speak(piece, langByMt(session.myLang).tts);
+    const spoke = speak(piece, langByMt(session.myLang).tts);
+    if(!spoke && state.tts && !session.voiceNoted){
+      session.voiceNoted = true;
+      noteCallStatus("Captions only — no "+langByMt(session.myLang).name+" voice on this device");
+    }
   } else {
     interimThemEl = upsertInterim("them", piece, interimThemEl);
   }
+}
+let statusNoteTimer = null;
+function noteCallStatus(msg){
+  setCallStatus(msg, true);
+  clearTimeout(statusNoteTimer);
+  statusNoteTimer = setTimeout(()=> setCallStatus("Connected", true), 6000);
 }
 function showMyCaption(text, final){
   // show my own words (already in my language) so I can see what's being sent
